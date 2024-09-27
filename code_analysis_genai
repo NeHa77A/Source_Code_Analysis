@@ -1,0 +1,672 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "!pip install openai tiktoken chromadb langchain langchain-community GitPython gpt4all llama-cpp-python"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Number of documents loaded: 28\n"
+     ]
+    }
+   ],
+   "source": [
+    "import os\n",
+    "from git import Repo\n",
+    "from langchain_text_splitters import Language\n",
+    "from langchain_community.document_loaders.generic import GenericLoader\n",
+    "from langchain_community.document_loaders.parsers import LanguageParser\n",
+    "\n",
+    "# Create test_repo in the current working directory\n",
+    "repo_path = os.path.join(os.getcwd(), \"test_repo\")\n",
+    "\n",
+    "# Ensure the directory doesn't already exist\n",
+    "if os.path.exists(repo_path):\n",
+    "    print(f\"The directory {repo_path} already exists. Please choose a different path or remove the existing directory.\")\n",
+    "else:\n",
+    "    repo = Repo.clone_from(\"https://github.com/NeHa77A/DEEP-AUTHENTICATOR.git\", to_path=repo_path)\n",
+    "\n",
+    "    loader = GenericLoader.from_filesystem(\n",
+    "        repo_path,\n",
+    "        glob=\"**/*\",\n",
+    "        suffixes=[\".py\"],\n",
+    "        parser=LanguageParser(language=Language.PYTHON, parser_threshold=500)\n",
+    "    )\n",
+    "    documents = loader.load()\n",
+    "    print(f\"Number of documents loaded: {len(documents)}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "36"
+      ]
+     },
+     "execution_count": 12,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "from langchain.text_splitter import RecursiveCharacterTextSplitter\n",
+    "python_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.PYTHON,\n",
+    "                                                               chunk_size=2000,\n",
+    "                                                               chunk_overlap=200)\n",
+    "texts = python_splitter.split_documents(documents)\n",
+    "len(texts)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "--2024-09-27 11:40:54--  https://huggingface.co/TheBloke/CodeLlama-13B-Instruct-GGUF/resolve/main/codellama-13b-instruct.Q4_K_M.gguf\n",
+      "Resolving huggingface.co (huggingface.co)... 2600:9000:2337:6600:17:b174:6d00:93a1, 2600:9000:2337:ca00:17:b174:6d00:93a1, 2600:9000:2337:1000:17:b174:6d00:93a1, ...\n",
+      "Connecting to huggingface.co (huggingface.co)|2600:9000:2337:6600:17:b174:6d00:93a1|:443... connected.\n",
+      "HTTP request sent, awaiting response... 302 Found\n",
+      "Location: https://cdn-lfs.hf.co/repos/7b/80/7b800b9247db84b65d4ca008ca4433a306b7f259163c4d026874b4aa9f7112eb/48cc5600c5e35b1226208a53b1871f50efb15764232babaef23e2264c285d7d9?response-content-disposition=inline%3B+filename*%3DUTF-8%27%27codellama-13b-instruct.Q4_K_M.gguf%3B+filename%3D%22codellama-13b-instruct.Q4_K_M.gguf%22%3B&Expires=1727714454&Policy=eyJTdGF0ZW1lbnQiOlt7IkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTcyNzcxNDQ1NH19LCJSZXNvdXJjZSI6Imh0dHBzOi8vY2RuLWxmcy5oZi5jby9yZXBvcy83Yi84MC83YjgwMGI5MjQ3ZGI4NGI2NWQ0Y2EwMDhjYTQ0MzNhMzA2YjdmMjU5MTYzYzRkMDI2ODc0YjRhYTlmNzExMmViLzQ4Y2M1NjAwYzVlMzViMTIyNjIwOGE1M2IxODcxZjUwZWZiMTU3NjQyMzJiYWJhZWYyM2UyMjY0YzI4NWQ3ZDk%7EcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIn1dfQ__&Signature=v%7EIvaim8E3i%7EU6s0QVO49R-kNfoQrbp7bywAWrDf3oaclbT6N%7EfOZJJNjsKvjgnthBlFpIEUCv6owSVQAK4e-VuMEfQqhq7LW6cwLehbTPDic2F13vELE6UWffecrtBkJS0Q-6olYEdgahRZgyEG61n1gdG26HEU9yegg4D3l7tNWr3nWs6Gr8hBUcrRVrF-F6CP8PLVauPNi41PSuXt0u%7EF%7EfgcDh9DsvpcX9P2YHckecGaItFFvI7ghMfzFKEEXh9anoKQH2ZqsIDdN6xh5lPnEpM5UxGUU0GO2T0y9ZzAk-uztKrQvq1dJBypObS0-yBw6r0UjVJ4jimWuWZTSw__&Key-Pair-Id=K3RPWS32NSSJCE [following]\n",
+      "--2024-09-27 11:40:54--  https://cdn-lfs.hf.co/repos/7b/80/7b800b9247db84b65d4ca008ca4433a306b7f259163c4d026874b4aa9f7112eb/48cc5600c5e35b1226208a53b1871f50efb15764232babaef23e2264c285d7d9?response-content-disposition=inline%3B+filename*%3DUTF-8%27%27codellama-13b-instruct.Q4_K_M.gguf%3B+filename%3D%22codellama-13b-instruct.Q4_K_M.gguf%22%3B&Expires=1727714454&Policy=eyJTdGF0ZW1lbnQiOlt7IkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTcyNzcxNDQ1NH19LCJSZXNvdXJjZSI6Imh0dHBzOi8vY2RuLWxmcy5oZi5jby9yZXBvcy83Yi84MC83YjgwMGI5MjQ3ZGI4NGI2NWQ0Y2EwMDhjYTQ0MzNhMzA2YjdmMjU5MTYzYzRkMDI2ODc0YjRhYTlmNzExMmViLzQ4Y2M1NjAwYzVlMzViMTIyNjIwOGE1M2IxODcxZjUwZWZiMTU3NjQyMzJiYWJhZWYyM2UyMjY0YzI4NWQ3ZDk%7EcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIn1dfQ__&Signature=v%7EIvaim8E3i%7EU6s0QVO49R-kNfoQrbp7bywAWrDf3oaclbT6N%7EfOZJJNjsKvjgnthBlFpIEUCv6owSVQAK4e-VuMEfQqhq7LW6cwLehbTPDic2F13vELE6UWffecrtBkJS0Q-6olYEdgahRZgyEG61n1gdG26HEU9yegg4D3l7tNWr3nWs6Gr8hBUcrRVrF-F6CP8PLVauPNi41PSuXt0u%7EF%7EfgcDh9DsvpcX9P2YHckecGaItFFvI7ghMfzFKEEXh9anoKQH2ZqsIDdN6xh5lPnEpM5UxGUU0GO2T0y9ZzAk-uztKrQvq1dJBypObS0-yBw6r0UjVJ4jimWuWZTSw__&Key-Pair-Id=K3RPWS32NSSJCE\n",
+      "Resolving cdn-lfs.hf.co (cdn-lfs.hf.co)... 18.245.124.72, 18.245.124.90, 18.245.124.8, ...\n",
+      "Connecting to cdn-lfs.hf.co (cdn-lfs.hf.co)|18.245.124.72|:443... connected.\n",
+      "HTTP request sent, awaiting response... 200 OK\n",
+      "Length: 7866070016 (7.3G) [binary/octet-stream]\n",
+      "Saving to: ‘codellama-13b-instruct.Q4_K_M.gguf’\n",
+      "\n",
+      "        codellama-1   0%[                    ]  33.25M  82.4MB/s               "
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "codellama-13b-instr 100%[===================>]   7.33G  52.7MB/s    in 98s     \n",
+      "\n",
+      "2024-09-27 11:42:32 (76.5 MB/s) - ‘codellama-13b-instruct.Q4_K_M.gguf’ saved [7866070016/7866070016]\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "!wget https://huggingface.co/TheBloke/CodeLlama-13B-Instruct-GGUF/resolve/main/codellama-13b-instruct.Q4_K_M.gguf"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "!CMAKE_ARGS=\"-DLLAMA_CUBLAS=on\" FORCE_CMAKE=1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Collecting gpt4all\n",
+      "  Using cached gpt4all-2.8.2-py3-none-manylinux1_x86_64.whl.metadata (4.8 kB)\n",
+      "Requirement already satisfied: requests in ./venv/lib/python3.10/site-packages (from gpt4all) (2.32.3)\n",
+      "Collecting tqdm (from gpt4all)\n",
+      "  Using cached tqdm-4.66.5-py3-none-any.whl.metadata (57 kB)\n",
+      "Requirement already satisfied: typing-extensions>=4.3.0 in ./venv/lib/python3.10/site-packages (from gpt4all) (4.12.2)\n",
+      "Requirement already satisfied: charset-normalizer<4,>=2 in ./venv/lib/python3.10/site-packages (from requests->gpt4all) (3.3.2)\n",
+      "Requirement already satisfied: idna<4,>=2.5 in ./venv/lib/python3.10/site-packages (from requests->gpt4all) (3.10)\n",
+      "Requirement already satisfied: urllib3<3,>=1.21.1 in ./venv/lib/python3.10/site-packages (from requests->gpt4all) (2.2.3)\n",
+      "Requirement already satisfied: certifi>=2017.4.17 in ./venv/lib/python3.10/site-packages (from requests->gpt4all) (2024.8.30)\n",
+      "Using cached gpt4all-2.8.2-py3-none-manylinux1_x86_64.whl (121.6 MB)\n",
+      "Using cached tqdm-4.66.5-py3-none-any.whl (78 kB)\n",
+      "Installing collected packages: tqdm, gpt4all\n",
+      "Successfully installed gpt4all-2.8.2 tqdm-4.66.5\n"
+     ]
+    }
+   ],
+   "source": [
+    "!pip install gpt4all"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "100\n"
+     ]
+    }
+   ],
+   "source": [
+    "from gpt4all import GPT4All\n",
+    "\n",
+    "# Use the correct device specification\n",
+    "model = GPT4All(\"orca-mini-3b-gguf2-q4_0.gguf\", device='cuda:NVIDIA GeForce RTX 4090')\n",
+    "\n",
+    "output = model.generate(\"The capital of France is \", max_tokens=3)\n",
+    "print(output)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/home/vivek/Documents/prashantPer/neha/llm/venv/lib/python3.10/site-packages/pydantic/_internal/_fields.py:132: UserWarning: Field \"model_name\" in GPT4AllEmbeddings has conflict with protected namespace \"model_\".\n",
+      "\n",
+      "You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.\n",
+      "  warnings.warn(\n"
+     ]
+    }
+   ],
+   "source": [
+    "from langchain_community.embeddings import GPT4AllEmbeddings\n",
+    "\n",
+    "model_name = \"all-MiniLM-L6-v2.gguf2.f16.gguf\"\n",
+    "gpt4all_kwargs = {'allow_download': 'True'}\n",
+    "embeddings = GPT4AllEmbeddings(\n",
+    "    model_name=model_name,\n",
+    "    gpt4all_kwargs=gpt4all_kwargs\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from langchain.vectorstores import Chroma\n",
+    "from langchain_community.embeddings import GPT4AllEmbeddings\n",
+    "\n",
+    "model_name = \"all-MiniLM-L6-v2.gguf2.f16.gguf\"\n",
+    "gpt4all_kwargs = {'allow_download': 'True'}\n",
+    "\n",
+    "db = Chroma.from_documents(texts, embedding = GPT4AllEmbeddings(model_name=model_name,\n",
+    "    gpt4all_kwargs=gpt4all_kwargs))\n",
+    "retriever = db.as_retriever(\n",
+    "    search_type=\"mmr\", # Also test \"similarity\"\n",
+    "    search_kwargs={\"k\": 8},\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "llama_model_loader: loaded meta data with 20 key-value pairs and 363 tensors from codellama-13b-instruct.Q4_K_M.gguf (version GGUF V2)\n",
+      "llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.\n",
+      "llama_model_loader: - kv   0:                       general.architecture str              = llama\n",
+      "llama_model_loader: - kv   1:                               general.name str              = codellama_codellama-13b-instruct-hf\n",
+      "llama_model_loader: - kv   2:                       llama.context_length u32              = 16384\n",
+      "llama_model_loader: - kv   3:                     llama.embedding_length u32              = 5120\n",
+      "llama_model_loader: - kv   4:                          llama.block_count u32              = 40\n",
+      "llama_model_loader: - kv   5:                  llama.feed_forward_length u32              = 13824\n",
+      "llama_model_loader: - kv   6:                 llama.rope.dimension_count u32              = 128\n",
+      "llama_model_loader: - kv   7:                 llama.attention.head_count u32              = 40\n",
+      "llama_model_loader: - kv   8:              llama.attention.head_count_kv u32              = 40\n",
+      "llama_model_loader: - kv   9:     llama.attention.layer_norm_rms_epsilon f32              = 0.000010\n",
+      "llama_model_loader: - kv  10:                       llama.rope.freq_base f32              = 1000000.000000\n",
+      "llama_model_loader: - kv  11:                          general.file_type u32              = 15\n",
+      "llama_model_loader: - kv  12:                       tokenizer.ggml.model str              = llama\n",
+      "llama_model_loader: - kv  13:                      tokenizer.ggml.tokens arr[str,32016]   = [\"<unk>\", \"<s>\", \"</s>\", \"<0x00>\", \"<...\n",
+      "llama_model_loader: - kv  14:                      tokenizer.ggml.scores arr[f32,32016]   = [0.000000, 0.000000, 0.000000, 0.0000...\n",
+      "llama_model_loader: - kv  15:                  tokenizer.ggml.token_type arr[i32,32016]   = [2, 3, 3, 6, 6, 6, 6, 6, 6, 6, 6, 6, ...\n",
+      "llama_model_loader: - kv  16:                tokenizer.ggml.bos_token_id u32              = 1\n",
+      "llama_model_loader: - kv  17:                tokenizer.ggml.eos_token_id u32              = 2\n",
+      "llama_model_loader: - kv  18:            tokenizer.ggml.unknown_token_id u32              = 0\n",
+      "llama_model_loader: - kv  19:               general.quantization_version u32              = 2\n",
+      "llama_model_loader: - type  f32:   81 tensors\n",
+      "llama_model_loader: - type q4_K:  241 tensors\n",
+      "llama_model_loader: - type q6_K:   41 tensors\n",
+      "llm_load_vocab: special tokens cache size = 259\n",
+      "llm_load_vocab: token to piece cache size = 0.1686 MB\n",
+      "llm_load_print_meta: format           = GGUF V2\n",
+      "llm_load_print_meta: arch             = llama\n",
+      "llm_load_print_meta: vocab type       = SPM\n",
+      "llm_load_print_meta: n_vocab          = 32016\n",
+      "llm_load_print_meta: n_merges         = 0\n",
+      "llm_load_print_meta: n_ctx_train      = 16384\n",
+      "llm_load_print_meta: n_embd           = 5120\n",
+      "llm_load_print_meta: n_head           = 40\n",
+      "llm_load_print_meta: n_head_kv        = 40\n",
+      "llm_load_print_meta: n_layer          = 40\n",
+      "llm_load_print_meta: n_rot            = 128\n",
+      "llm_load_print_meta: n_embd_head_k    = 128\n",
+      "llm_load_print_meta: n_embd_head_v    = 128\n",
+      "llm_load_print_meta: n_gqa            = 1\n",
+      "llm_load_print_meta: n_embd_k_gqa     = 5120\n",
+      "llm_load_print_meta: n_embd_v_gqa     = 5120\n",
+      "llm_load_print_meta: f_norm_eps       = 0.0e+00\n",
+      "llm_load_print_meta: f_norm_rms_eps   = 1.0e-05\n",
+      "llm_load_print_meta: f_clamp_kqv      = 0.0e+00\n",
+      "llm_load_print_meta: f_max_alibi_bias = 0.0e+00\n",
+      "llm_load_print_meta: f_logit_scale    = 0.0e+00\n",
+      "llm_load_print_meta: n_ff             = 13824\n",
+      "llm_load_print_meta: n_expert         = 0\n",
+      "llm_load_print_meta: n_expert_used    = 0\n",
+      "llm_load_print_meta: causal attn      = 1\n",
+      "llm_load_print_meta: pooling type     = 0\n",
+      "llm_load_print_meta: rope type        = 0\n",
+      "llm_load_print_meta: rope scaling     = linear\n",
+      "llm_load_print_meta: freq_base_train  = 1000000.0\n",
+      "llm_load_print_meta: freq_scale_train = 1\n",
+      "llm_load_print_meta: n_yarn_orig_ctx  = 16384\n",
+      "llm_load_print_meta: rope_finetuned   = unknown\n",
+      "llm_load_print_meta: ssm_d_conv       = 0\n",
+      "llm_load_print_meta: ssm_d_inner      = 0\n",
+      "llm_load_print_meta: ssm_d_state      = 0\n",
+      "llm_load_print_meta: ssm_dt_rank      = 0\n",
+      "llm_load_print_meta: model type       = 13B\n",
+      "llm_load_print_meta: model ftype      = Q4_K - Medium\n",
+      "llm_load_print_meta: model params     = 13.02 B\n",
+      "llm_load_print_meta: model size       = 7.33 GiB (4.83 BPW) \n",
+      "llm_load_print_meta: general.name     = codellama_codellama-13b-instruct-hf\n",
+      "llm_load_print_meta: BOS token        = 1 '<s>'\n",
+      "llm_load_print_meta: EOS token        = 2 '</s>'\n",
+      "llm_load_print_meta: UNK token        = 0 '<unk>'\n",
+      "llm_load_print_meta: LF token         = 13 '<0x0A>'\n",
+      "llm_load_print_meta: PRE token        = 32007 '▁<PRE>'\n",
+      "llm_load_print_meta: SUF token        = 32008 '▁<SUF>'\n",
+      "llm_load_print_meta: MID token        = 32009 '▁<MID>'\n",
+      "llm_load_print_meta: EOT token        = 32010 '▁<EOT>'\n",
+      "llm_load_tensors: ggml ctx size =    0.18 MiB\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "llm_load_tensors:        CPU buffer size =  7500.96 MiB\n",
+      "....................................................................................................\n",
+      "llama_new_context_with_model: n_ctx      = 5024\n",
+      "llama_new_context_with_model: n_batch    = 512\n",
+      "llama_new_context_with_model: n_ubatch   = 512\n",
+      "llama_new_context_with_model: flash_attn = 0\n",
+      "llama_new_context_with_model: freq_base  = 10000.0\n",
+      "llama_new_context_with_model: freq_scale = 1\n",
+      "llama_kv_cache_init:        CPU KV buffer size =  3925.00 MiB\n",
+      "llama_new_context_with_model: KV self size  = 3925.00 MiB, K (f16): 1962.50 MiB, V (f16): 1962.50 MiB\n",
+      "llama_new_context_with_model:        CPU  output buffer size =     0.12 MiB\n",
+      "llama_new_context_with_model:        CPU compute buffer size =   442.32 MiB\n",
+      "llama_new_context_with_model: graph nodes  = 1286\n",
+      "llama_new_context_with_model: graph splits = 1\n",
+      "AVX = 1 | AVX_VNNI = 1 | AVX2 = 1 | AVX512 = 0 | AVX512_VBMI = 0 | AVX512_VNNI = 0 | AVX512_BF16 = 0 | FMA = 1 | NEON = 0 | SVE = 0 | ARM_FMA = 0 | F16C = 1 | FP16_VA = 0 | WASM_SIMD = 0 | BLAS = 0 | SSE3 = 1 | SSSE3 = 1 | VSX = 0 | MATMUL_INT8 = 0 | LLAMAFILE = 1 | \n",
+      "Model metadata: {'tokenizer.ggml.unknown_token_id': '0', 'tokenizer.ggml.eos_token_id': '2', 'general.architecture': 'llama', 'llama.rope.freq_base': '1000000.000000', 'llama.context_length': '16384', 'general.name': 'codellama_codellama-13b-instruct-hf', 'llama.embedding_length': '5120', 'llama.feed_forward_length': '13824', 'llama.attention.layer_norm_rms_epsilon': '0.000010', 'llama.rope.dimension_count': '128', 'tokenizer.ggml.bos_token_id': '1', 'llama.attention.head_count': '40', 'llama.block_count': '40', 'llama.attention.head_count_kv': '40', 'general.quantization_version': '2', 'tokenizer.ggml.model': 'llama', 'general.file_type': '15'}\n",
+      "Using fallback chat format: llama-2\n"
+     ]
+    }
+   ],
+   "source": [
+    "from langchain_community.llms import LlamaCpp\n",
+    "from langchain.prompts import PromptTemplate\n",
+    "from langchain.chains import LLMChain\n",
+    "from langchain.callbacks.manager import CallbackManager\n",
+    "from langchain.memory import ConversationSummaryMemory\n",
+    "from langchain.chains import ConversationalRetrievalChain\n",
+    "from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler\n",
+    "\n",
+    "callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])\n",
+    "llm = LlamaCpp(\n",
+    "    model_path=\"codellama-13b-instruct.Q4_K_M.gguf\",\n",
+    "    n_ctx=5000,\n",
+    "    n_gpu_layers=30,\n",
+    "    n_batch=512,\n",
+    "    f16_kv=True,  # MUST set to True, otherwise you will run into problem after a couple of calls\n",
+    "    callback_manager=callback_manager,\n",
+    "    verbose=True,\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 30,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Collecting llama-cpp-python==0.2.77\n",
+      "  Using cached llama_cpp_python-0.2.77-cp310-cp310-linux_x86_64.whl\n",
+      "Requirement already satisfied: typing-extensions>=4.5.0 in ./venv/lib/python3.10/site-packages (from llama-cpp-python==0.2.77) (4.12.2)\n",
+      "Requirement already satisfied: numpy>=1.20.0 in ./venv/lib/python3.10/site-packages (from llama-cpp-python==0.2.77) (1.26.4)\n",
+      "Collecting diskcache>=5.6.1 (from llama-cpp-python==0.2.77)\n",
+      "  Using cached diskcache-5.6.3-py3-none-any.whl.metadata (20 kB)\n",
+      "Collecting jinja2>=2.11.3 (from llama-cpp-python==0.2.77)\n",
+      "  Using cached jinja2-3.1.4-py3-none-any.whl.metadata (2.6 kB)\n",
+      "Collecting MarkupSafe>=2.0 (from jinja2>=2.11.3->llama-cpp-python==0.2.77)\n",
+      "  Using cached MarkupSafe-2.1.5-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (3.0 kB)\n",
+      "Using cached diskcache-5.6.3-py3-none-any.whl (45 kB)\n",
+      "Using cached jinja2-3.1.4-py3-none-any.whl (133 kB)\n",
+      "Using cached MarkupSafe-2.1.5-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (25 kB)\n",
+      "Installing collected packages: MarkupSafe, diskcache, jinja2, llama-cpp-python\n",
+      "Successfully installed MarkupSafe-2.1.5 diskcache-5.6.3 jinja2-3.1.4 llama-cpp-python-0.2.77\n"
+     ]
+    }
+   ],
+   "source": [
+    "!CMAKE_ARGS=\"-DLLAMA_CUBLAS=on\" FORCE_CMAKE=1 pip install llama-cpp-python==0.2.77"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 32,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/tmp/ipykernel_692400/434828806.py:4: LangChainDeprecationWarning: Please see the migration guide at: https://python.langchain.com/docs/versions/migrating_memory/\n",
+      "  memory = ConversationSummaryMemory(llm=llm,memory_key=\"chat_history\",return_messages=True)\n"
+     ]
+    }
+   ],
+   "source": [
+    "from langchain.memory import ConversationSummaryMemory\n",
+    "from langchain.chains import ConversationalRetrievalChain\n",
+    "\n",
+    "memory = ConversationSummaryMemory(llm=llm,memory_key=\"chat_history\",return_messages=True)\n",
+    "qa = ConversationalRetrievalChain.from_llm(llm, retriever=retriever, memory=memory)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 35,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Llama.generate: prefix-match hit\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\n",
+      "we are using python library called face-auth for all the operations of the face authenticator system.\n",
+      "\n",
+      "\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "\n",
+      "llama_print_timings:        load time =   24424.85 ms\n",
+      "llama_print_timings:      sample time =      16.97 ms /    25 runs   (    0.68 ms per token,  1472.84 tokens per second)\n",
+      "llama_print_timings: prompt eval time =  137572.94 ms /  2032 tokens (   67.70 ms per token,    14.77 tokens per second)\n",
+      "llama_print_timings:        eval time =   27536.63 ms /    24 runs   ( 1147.36 ms per token,     0.87 tokens per second)\n",
+      "llama_print_timings:       total time =  107557.24 ms /  2056 tokens\n",
+      "Llama.generate: prefix-match hit\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\n",
+      "The human asks what the AI thinks of artificial intelligence. The AI thinks artificial intelligence is a force for good because it will help humans reach their full potential.\n",
+      "\n",
+      "Current summary:\n",
+      "The human asks what the AI thinks of artificial intelligence. The AI thinks artificial intelligence is a force for good.\n",
+      "\n",
+      "New lines of conversation:\n",
+      "Human: why do you think artificial intelligence is a force for good?\n",
+      "AI: Because artificial intelligence will help humans reach their full potential.\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "\n",
+      "llama_print_timings:        load time =   24424.85 ms\n",
+      "llama_print_timings:      sample time =     162.47 ms /   256 runs   (    0.63 ms per token,  1575.65 tokens per second)\n",
+      "llama_print_timings: prompt eval time =   13162.04 ms /   197 tokens (   66.81 ms per token,    14.97 tokens per second)\n",
+      "llama_print_timings:        eval time =  281665.74 ms /   255 runs   ( 1104.57 ms per token,     0.91 tokens per second)\n",
+      "llama_print_timings:       total time =  296734.78 ms /   452 tokens\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "'\\nwe are using python library called face-auth for all the operations of the face authenticator system.\\n\\n\\n'"
+      ]
+     },
+     "execution_count": 35,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "question = \"which tool we are using in face_auth folder?\"\n",
+    "result = qa(question)\n",
+    "result['answer']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.14"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
