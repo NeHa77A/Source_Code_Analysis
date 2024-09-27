@@ -2,7 +2,7 @@
 
 # LLM and Code Analysis Practice Notebook
 
-This repository contains a Jupyter notebook (`2. Open `code_analysis_genai.ipynb`) that demonstrates various techniques for working with Large Language Models (LLMs) and analyzing code repositories.
+This repository contains a Jupyter notebook (`code_analysis_genai.ipynb`) that demonstrates various techniques for working with Large Language Models (LLMs) and analyzing code repositories.
 
 ## Overview
 
@@ -80,6 +80,3 @@ If you encounter issues with `llama-cpp-python`, you may need to install it with
 CMAKE_ARGS="-DLLAMA_CUBLAS=on" FORCE_CMAKE=1 pip install llama-cpp-python==0.2.77
 ```
 
-## License
-
-[Specify the license under which this project is released]
